@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSV Parser</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 40px; }
+#status { margin-top: 20px; font-weight: bold; }
+#output { margin-top: 20px; white-space: pre-wrap; background: #f5f5f5; padding: 15px; border-radius: 5px; max-height: 700px; overflow: auto; }
+</style>
+</head>
+<body>
+<h1>CSV Parser</h1>
+<div id="status">Loading CSV...</div>
+<pre id="output"></pre>
+<script>
+function detectDelimiter(text) {
+    const candidates = [";", ",", "\t", "|"];
+    const sample = text.slice(0, Math.min(text.length, 10000));
+    function countOutsideQuotes(delimiter) {
+        let count = 0;
+        let insideQuotes = false;
+        for (let i = 0; i < sample.length; i++) {
+            const char = sample[i];
+            const nextChar = sample[i + 1];
+            if (char === '"') {
+                if (insideQuotes && nextChar === '"') i++;
+                else insideQuotes = !insideQuotes;
+            } else if (char === delimiter && !insideQuotes) count++;
+        }
+        return count;
+    }
+    return candidates.reduce((best, delimiter) =>
+        countOutsideQuotes(delimiter) > countOutsideQuotes(best) ? delimiter : best,
+        candidates[0]
+    );
+}
+
+function parseCSV(text, delimiter = null) {
+    text = text.replace(/^\uFEFF/, "");
+    if (!delimiter) delimiter = detectDelimiter(text);
+
+    const rows = [];
+    let row = [];
+    let field = "";
+    let insideQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const nextChar = text[i + 1];
+
+        if (char === '"') {
+            if (insideQuotes && nextChar === '"') {
+                field += '"';
+                i++;
+            } else {
+                insideQuotes = !insideQuotes;
+            }
+            continue;
+        }
+
+        if (char === delimiter && !insideQuotes) {
+            row.push(field);
+            field = "";
+            continue;
+        }
+
+        if ((char === "\n" || char === "\r") && !insideQuotes) {
+            if (char === "\r" && nextChar === "\n") i++;
+            row.push(field);
+            field = "";
+            if (row.some(value => value.trim() !== "")) rows.push(row);
+            row = [];
+            continue;
+        }
+        field += char;
+    }
+
+    if (field !== "" || row.length > 0) {
+        row.push(field);
+        if (row.some(value => value.trim() !== "")) rows.push(row);
+    }
+
+    if (rows.length === 0) return { data: [], delimiter };
+
+    const headers = rows[0].map((header, index) => {
+        let value = header;
+        if (index === 0) value = value.replace(/^\uFEFF/, "");
+        return value.trim();
+    });
+
+    const data = rows.slice(1).map(row => {
+        const object = {};
+        headers.forEach((header, index) => {
+            object[header] = row[index] ?? "";
+        });
+        return object;
+    });
+
+    return { data, delimiter };
+}
+
+async function loadCSV() {
+    const status = document.getElementById("status");
+    const output = document.getElementById("output");
+    const start = performance.now();
+
+    try {
+        // measures_test.csv must be in the same folder as this HTML file.
+        const response = await fetch("./measures_test.csv");
+        if (!response.ok) {
+            throw new Error(`Failed to load measures_test.csv: HTTP ${response.status}`);
+        }
+
+        const text = await response.text();
+        const result = parseCSV(text);
+        const data = result.data;
+        const delimiterName = result.delimiter === ";" ? "semicolon (;)" :
+            result.delimiter === "," ? "comma (,)" :
+            result.delimiter === "\t" ? "tab" : result.delimiter;
+
+        console.log("Parsed data:", data);
+        console.log("CSV delimiter:", delimiterName);
+
+        status.textContent = `Parsed ${data.length.toLocaleString()} rows, ${Object.keys(data[0] || {}).length} columns, delimiter: ${delimiterName} in ${(performance.now() - start).toFixed(2)} ms`;
+        output.textContent = JSON.stringify(data, null, 2);
+
+        // The parsed CSV is available here as a normal JavaScript array:
+        window.csvData = data;
+    } catch (error) {
+        status.textContent = "Error loading CSV.";
+        output.textContent = error.message;
+        console.error(error);
+    }
+}
+
+loadCSV();
+</script>
+</body>
+</html>

@@ -1,0 +1,272 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Parser</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+
+        #status {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+        #output {
+            margin-top: 20px;
+            white-space: pre-wrap;
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 700px;
+            overflow: auto;
+        }
+    </style>
+</head>
+
+<body>
+
+
+
+
+<script>
+
+    // Detect CSV delimiter automatically.
+    function detectDelimiter(text) {
+        const candidates = [";", ",", "\t", "|"];
+        const sample = text.slice(0, Math.min(text.length, 10000));
+
+        function countOutsideQuotes(delimiter) {
+            let count = 0;
+            let insideQuotes = false;
+
+            for (let i = 0; i < sample.length; i++) {
+                const char = sample[i];
+                const nextChar = sample[i + 1];
+
+                if (char === '"') {
+                    if (insideQuotes && nextChar === '"') {
+                        i++;
+                    } else {
+                        insideQuotes = !insideQuotes;
+                    }
+                }
+                else if (char === delimiter && !insideQuotes) {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        return candidates.reduce((best, delimiter) => {
+            return countOutsideQuotes(delimiter) > countOutsideQuotes(best)
+                ? delimiter
+                : best;
+        }, candidates[0]);
+    }
+
+
+    // Parse CSV text into an array of objects.
+    function parseCSV(text, delimiter = null) {
+
+        // Remove UTF-8 BOM.
+        text = text.replace(/^\uFEFF/, "");
+
+        // Automatically detect delimiter.
+        if (!delimiter) {
+            delimiter = detectDelimiter(text);
+        }
+
+        const rows = [];
+        let row = [];
+        let field = "";
+        let insideQuotes = false;
+
+        for (let i = 0; i < text.length; i++) {
+
+            const char = text[i];
+            const nextChar = text[i + 1];
+
+            // Handle quotes.
+            if (char === '"') {
+
+                // Escaped quote: ""
+                if (insideQuotes && nextChar === '"') {
+                    field += '"';
+                    i++;
+                }
+                else {
+                    insideQuotes = !insideQuotes;
+                }
+
+                continue;
+            }
+
+            // Handle delimiter.
+            if (char === delimiter && !insideQuotes) {
+
+                row.push(field);
+                field = "";
+
+                continue;
+            }
+
+            // Handle line breaks.
+            if ((char === "\n" || char === "\r") && !insideQuotes) {
+
+                // Windows CRLF.
+                if (char === "\r" && nextChar === "\n") {
+                    i++;
+                }
+
+                row.push(field);
+                field = "";
+
+                // Ignore completely empty rows.
+                if (row.some(value => value.trim() !== "")) {
+                    rows.push(row);
+                }
+
+                row = [];
+
+                continue;
+            }
+
+            field += char;
+        }
+
+        // Add final field/row.
+        if (field !== "" || row.length > 0) {
+
+            row.push(field);
+
+            if (row.some(value => value.trim() !== "")) {
+                rows.push(row);
+            }
+        }
+
+        if (rows.length === 0) {
+            return {
+                data: [],
+                delimiter
+            };
+        }
+
+        // First row contains column names.
+        const headers = rows[0].map((header, index) => {
+
+            let value = header;
+
+            if (index === 0) {
+                value = value.replace(/^\uFEFF/, "");
+            }
+
+            return value.trim();
+        });
+
+
+        // Convert every row into an object.
+        const data = rows.slice(1).map(row => {
+
+            const object = {};
+
+            headers.forEach((header, index) => {
+                object[header] = row[index] ?? "";
+            });
+
+            return object;
+        });
+
+
+        return {
+            data,
+            delimiter
+        };
+    }
+
+
+    // Load CSV automatically.
+    async function loadCSV() {
+
+        try {
+
+            const start = performance.now();
+
+            // CSV must be in the same folder as this HTML file.
+            const response = await fetch("./measures_test.csv");
+
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to load CSV: HTTP ${response.status}`
+                );
+            }
+
+            // Read CSV as text.
+            const text = await response.text();
+
+            // Parse CSV.
+            const result = parseCSV(text);
+
+            // THIS IS YOUR ARRAY.
+            const data = result.data;
+
+            // Make it globally accessible.
+            window.csvData = data;
+
+            const end = performance.now();
+
+            const delimiterName =
+                result.delimiter === ";"
+                    ? "semicolon (;)"
+                    : result.delimiter === ","
+                        ? "comma (,)"
+                        : result.delimiter === "\t"
+                            ? "tab"
+                            : result.delimiter;
+
+
+            status.textContent =
+                `Loaded ${data.length.toLocaleString()} rows, ` +
+                `${Object.keys(data[0] || {}).length} columns, ` +
+                `delimiter: ${delimiterName} ` +
+                `(${(end - start).toFixed(2)} ms)`;
+
+
+            // Display parsed data.
+            //output.textContent =
+                JSON.stringify(data, null, 2);
+
+
+            // Also print the array to the console.
+            console.log("CSV data:", data);
+
+            console.log("First row:", data[0]);
+
+            console.log("Number of rows:", data.length);
+
+        }
+        catch (error) {
+
+            status.textContent =
+                "Error loading CSV: " + error.message;
+
+            output.textContent = "";
+
+            console.error(error);
+        }
+    }
+
+
+    // Start automatically when page loads.
+    loadCSV();
+
+</script>
+
+</body>
+</html>

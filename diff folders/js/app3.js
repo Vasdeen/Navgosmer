@@ -162,7 +162,7 @@
             const start = performance.now();
 
             // CSV must be in the same folder as this HTML file.
-            const response = await fetch("./measures_test.csv");
+            const response = await fetch("./data/measures_test.csv");
 
             if (!response.ok) {
                 throw new Error(

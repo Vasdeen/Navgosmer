@@ -2,7 +2,12 @@
     // Detect CSV delimiter automatically.
     function detectDelimiter(text) {
         const candidates = [";", ",", "\t", "|"];
-        const sample = text.slice(0, Math.min(text.length, 10000));
+        // Use only the header row: data rows contain free text with many
+        // commas, which used to outweigh the real ";" delimiter.
+        const headerEnd = text.search(/\r|\n/);
+        const sample = headerEnd === -1
+            ? text
+            : text.slice(0, headerEnd);
 
         function countOutsideQuotes(delimiter) {
             let count = 0;
@@ -194,16 +199,12 @@
                             : result.delimiter;
 
 
-            status.textContent =
+            console.log(
                 `Loaded ${data.length.toLocaleString()} rows, ` +
                 `${Object.keys(data[0] || {}).length} columns, ` +
                 `delimiter: ${delimiterName} ` +
-                `(${(end - start).toFixed(2)} ms)`;
-
-
-            // Display parsed data.
-            //output.textContent =
-                JSON.stringify(data, null, 2);
+                `(${(end - start).toFixed(2)} ms)`
+            );
 
 
             // Also print the array to the console.
@@ -217,12 +218,8 @@
         }
         catch (error) {
 
-            status.textContent =
-                "Error loading CSV: " + error.message;
-
-            output.textContent = "";
-
             console.error(error);
+            throw error;
         }
     }
 
@@ -1378,6 +1375,11 @@ function downloadResultsPDF() {
         });
 
         const row = (label, text, isLink = false) => {
+            // Пустые поля (прочерк) в печать не выводим.
+            if (text === "—") {
+                return "";
+            }
+
             const content = isLink && text !== "—"
                 ? `<a href="${escapeHTML(text)}">${escapeHTML(text)}</a>`
                 : escapeHTML(text);
@@ -1396,7 +1398,6 @@ function downloadResultsPDF() {
             return `
                 <article class="digest-card">
                     <div class="digest-card-top">
-                        <span>${escapeHTML(f.sphere)}</span>
                         <span>${escapeHTML(f.publication)}</span>
                     </div>
 
@@ -1525,9 +1526,33 @@ function downloadResultsPDF() {
                     font-size: 9pt;
                 }
 
+                /* Снимаем ограничения экрана: иначе Chrome обрезает
+                   всё, что не поместилось на первую страницу. */
+                html, body.digest-printing {
+                    height: auto !important;
+                    min-height: 0 !important;
+                    overflow: visible !important;
+                    display: block !important;
+                }
+
+                body.digest-printing #printResults,
+                body.digest-printing .digest-print-document,
+                body.digest-printing .digest-print-cards {
+                    height: auto !important;
+                    max-height: none !important;
+                    overflow: visible !important;
+                    position: static !important;
+                }
+
+                .digest-print-header {
+                    break-after: avoid;
+                }
+
+                /* Карточки длиннее страницы должны разрываться,
+                   поэтому break-inside: avoid здесь нельзя. */
                 .digest-card {
-                    break-inside: avoid;
-                    page-break-inside: avoid;
+                    break-inside: auto;
+                    page-break-inside: auto;
                     border: 1px solid #dce2e8;
                     border-radius: 6px;
                     background: #f7f9fb;
@@ -1535,9 +1560,15 @@ function downloadResultsPDF() {
                     margin: 0 0 12px;
                 }
 
+                .digest-card-top,
+                .digest-card h2 {
+                    break-after: avoid;
+                    page-break-after: avoid;
+                }
+
                 .digest-card-top {
                     display: flex;
-                    justify-content: space-between;
+                    justify-content: flex-end;
                     gap: 12px;
                     color: #5a646e;
                     font-size: 8pt;
@@ -1631,6 +1662,8 @@ if (downloadResultsBtn) {
 
 //=========================================================================
     //==================Главная функция, запуск страницы============================
+
+let DATA = [];
 
 async function init() {
 

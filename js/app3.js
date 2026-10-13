@@ -238,11 +238,25 @@ const state = {
 
     types: new Set(),
 
+    kinds: new Set(),
+
+    sites: new Set(),
+
+    operators: new Set(),
+
     pubFrom: "",
     pubTo: "",
 
     startFrom: "",
     startTo: "",
+
+    // Период действия: показывать ли меры с неизвестным периодом
+    // (нет ни начала, ни окончания). По умолчанию — показывать.
+    includeUnknownPeriod: true,
+
+    // Период действия: false — выбранные даты должны входить
+    // в период меры; true — достаточно пересечения периодов.
+    overlapPeriod: false,
 
     npa: "",
 
@@ -329,10 +343,76 @@ function uniqueSorted(arr) {
 }
 
 
+/*
+ * Сферы реализации записи.
+ * В данных поле хранится строкой-списком
+ * "['Отрасль 1', 'Отрасль 2', ...]" либо обычным текстом;
+ * возвращаем массив отдельных отраслей.
+ */
+function getSpheres(item) {
+
+    const raw =
+        String(item["Отрасль экономики"] || "").trim();
+
+    if (!raw) {
+        return [];
+    }
+
+    if (raw.startsWith("[")) {
+
+        const items = [
+            ...raw.matchAll(/'([^']*)'|"([^"]*)"/g)
+        ]
+            .map(m => (m[1] ?? m[2]).trim())
+            .filter(Boolean);
+
+        if (items.length) {
+            return items;
+        }
+
+        // Скобки есть, кавычек нет: "[Отрасль]" — берём как одну отрасль.
+        const inner = raw.replace(/^\[|\]$/g, "").trim();
+
+        return inner ? [inner] : [];
+    }
+
+    return [raw];
+}
+
+
+/*
+ * Сайт источника: ссылка до первого слэша
+ * (https://fasie.ru/press/... -> fasie.ru)
+ */
+function getSite(item) {
+
+    const link =
+        String(item["Ссылка"] || "").trim();
+
+    if (!link) {
+        return "";
+    }
+
+    return link
+        .replace(/^[a-z][a-z0-9+.-]*:\/\//i, "")
+        .replace(/^www\./i, "")
+        .split(/[\/?#]/)[0];
+}
+
+
 function matchesFilters(item) {
 
-    const sphere =
-        item["Отрасль экономики"] || "";
+    const spheres =
+        getSpheres(item);
+
+    const kind =
+        item["Вид меры поддержки"] || "";
+
+    const site =
+        getSite(item);
+
+    const operator =
+        item["Оператор меры поддержки/инициатор"] || "";
 
     const type =
         item["Тип меры поддержки"] || "";
@@ -346,6 +426,13 @@ function matchesFilters(item) {
         dateToComparable(
             item[
                 "Срок проведения конкурса (начало) /начало действия НПА"
+            ]
+        );
+
+    const endDate =
+        dateToComparable(
+            item[
+                "Срок проведения конкурса (окончание)"
             ]
         );
 
@@ -364,7 +451,7 @@ function matchesFilters(item) {
 
     if (
         state.spheres.size &&
-        !state.spheres.has(sphere)
+        !spheres.some(s => state.spheres.has(s))
     ) {
         return false;
     }
@@ -377,6 +464,42 @@ function matchesFilters(item) {
     if (
         state.types.size &&
         !state.types.has(type)
+    ) {
+        return false;
+    }
+
+
+    /*
+     * Вид меры
+     */
+
+    if (
+        state.kinds.size &&
+        !state.kinds.has(kind)
+    ) {
+        return false;
+    }
+
+
+    /*
+     * Сайт
+     */
+
+    if (
+        state.sites.size &&
+        !state.sites.has(site)
+    ) {
+        return false;
+    }
+
+
+    /*
+     * Оператор
+     */
+
+    if (
+        state.operators.size &&
+        !state.operators.has(operator)
     ) {
         return false;
     }
@@ -413,32 +536,70 @@ function matchesFilters(item) {
 
 
     /*
-     * Начало действия — от
+     * Период действия меры.
+     *
+     * Если у меры нет ни начала, ни окончания — период неизвестен;
+     * такая мера проходит фильтр, пока включена кнопка
+     * «Неизвестный период».
+     *
+     * Режим «вхождение» (по умолчанию): каждая заданная в фильтре
+     * дата должна быть не раньше начала и не позже окончания меры.
+     *
+     * Режим «пересечение»: период меры должен пересекаться
+     * с выбранным диапазоном.
+     *
+     * Если у меры нет начала (или окончания), проверяется
+     * только та граница, которая есть.
      */
 
-    if (
-        state.startFrom &&
-        (
-            !startDate ||
-            startDate < state.startFrom
-        )
-    ) {
-        return false;
-    }
+    if (state.startFrom || state.startTo) {
 
+        if (!startDate && !endDate) {
 
-    /*
-     * Начало действия — до
-     */
+            if (!state.includeUnknownPeriod) {
+                return false;
+            }
+        }
 
-    if (
-        state.startTo &&
-        (
-            !startDate ||
-            startDate > state.startTo
-        )
-    ) {
-        return false;
+        else if (state.overlapPeriod) {
+
+            if (
+                state.startTo &&
+                startDate &&
+                startDate > state.startTo
+            ) {
+                return false;
+            }
+
+            if (
+                state.startFrom &&
+                endDate &&
+                endDate < state.startFrom
+            ) {
+                return false;
+            }
+        }
+
+        else {
+
+            const inPeriod = date =>
+                (!startDate || date >= startDate) &&
+                (!endDate || date <= endDate);
+
+            if (
+                state.startFrom &&
+                !inPeriod(state.startFrom)
+            ) {
+                return false;
+            }
+
+            if (
+                state.startTo &&
+                !inPeriod(state.startTo)
+            ) {
+                return false;
+            }
+        }
     }
 
 
@@ -692,11 +853,19 @@ function render() {
 
             <div class="item-top">
 
-                <span class="stamp">
-                    ${sphere}
-                </span>
+                ${
+                    /* Отрасль экономики в списке временно скрыта.
+                       Чтобы вернуть — раскомментируйте блок ниже
+                       и удалите эту строку-заглушку: ""
 
-                <span class="item-date">
+                    `<span class="stamp">
+                        ${sphere}
+                    </span>`
+                    */
+                    ""
+                }
+
+                <span class="item-date" style="margin-left:auto">
                     ${publicationDate}
                 </span>
 
@@ -769,16 +938,24 @@ function render() {
         document.getElementById("sphereChips"),
 
         uniqueSorted(
-            DATA.map(
-                item =>
-                    item["Отрасль экономики"]
-            )
+            DATA.flatMap(getSpheres)
         ),
 
         state.spheres,
 
         render
     );
+
+    // Число выбранных отраслей в заголовке раскрывающегося списка
+    const sphereCount =
+        document.getElementById("sphereCount");
+
+    if (sphereCount) {
+        sphereCount.textContent =
+            state.spheres.size
+                ? `(${state.spheres.size})`
+                : "";
+    }
 
 
     /*
@@ -796,6 +973,65 @@ function render() {
         ),
 
         state.types,
+
+        render
+    );
+
+
+    /*
+     * Фильтр видов меры
+     */
+
+    buildChips(
+        document.getElementById("kindChips"),
+
+        uniqueSorted(
+            DATA.map(
+                item =>
+                    item["Вид меры поддержки"]
+            )
+        ),
+
+        state.kinds,
+
+        render
+    );
+
+
+    /*
+     * Фильтр сайтов
+     */
+
+    buildChips(
+        document.getElementById("siteChips"),
+
+        uniqueSorted(
+            DATA.map(getSite)
+        ),
+
+        state.sites,
+
+        render
+    );
+
+
+    /*
+     * Фильтр операторов
+     */
+
+    buildChips(
+        document.getElementById("operatorChips"),
+
+        uniqueSorted(
+            DATA.map(
+                item =>
+                    item[
+                        "Оператор меры поддержки/инициатор"
+                    ]
+            )
+        ),
+
+        state.operators,
 
         render
     );
@@ -1194,6 +1430,76 @@ if (startTo) {
 
 
 /* =========================================================
+   Кнопки уточнения периода действия
+   ========================================================= */
+
+const periodUnknownBtn =
+    document.getElementById("periodUnknownBtn");
+
+const periodOverlapBtn =
+    document.getElementById("periodOverlapBtn");
+
+
+function syncPeriodButtons() {
+
+    if (periodUnknownBtn) {
+        periodUnknownBtn.setAttribute(
+            "aria-pressed",
+            state.includeUnknownPeriod
+                ? "true"
+                : "false"
+        );
+    }
+
+    if (periodOverlapBtn) {
+        periodOverlapBtn.setAttribute(
+            "aria-pressed",
+            state.overlapPeriod
+                ? "true"
+                : "false"
+        );
+    }
+}
+
+
+if (periodUnknownBtn) {
+
+    periodUnknownBtn.addEventListener(
+        "click",
+        () => {
+
+            state.includeUnknownPeriod =
+                !state.includeUnknownPeriod;
+
+            syncPeriodButtons();
+
+            render();
+        }
+    );
+}
+
+
+if (periodOverlapBtn) {
+
+    periodOverlapBtn.addEventListener(
+        "click",
+        () => {
+
+            state.overlapPeriod =
+                !state.overlapPeriod;
+
+            syncPeriodButtons();
+
+            render();
+        }
+    );
+}
+
+
+syncPeriodButtons();
+
+
+/* =========================================================
    Фильтр НПА
    ========================================================= */
 
@@ -1232,11 +1538,22 @@ if (resetFilters) {
 
             state.types.clear();
 
+            state.kinds.clear();
+
+            state.sites.clear();
+
+            state.operators.clear();
+
             state.pubFrom = "";
             state.pubTo = "";
 
             state.startFrom = "";
             state.startTo = "";
+
+            state.includeUnknownPeriod = true;
+            state.overlapPeriod = false;
+
+            syncPeriodButtons();
 
             state.npa = "";
 

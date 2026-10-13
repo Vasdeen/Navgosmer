@@ -67,13 +67,23 @@
     </div>
 
     <div class="filter-group">
-      <div class="label">Сфера реализации</div>
-      <div class="chip-list" id="sphereChips"></div>
+      <div class="label">Тип поддержки</div>
+      <div class="chip-list" id="typeChips"></div>
     </div>
 
     <div class="filter-group">
-      <div class="label">Тип поддержки</div>
-      <div class="chip-list" id="typeChips"></div>
+      <div class="label">Вид поддержки</div>
+      <div class="chip-list" id="kindChips"></div>
+    </div>
+
+    <div class="filter-group">
+      <div class="label">Сайт</div>
+      <div class="chip-list" id="siteChips"></div>
+    </div>
+
+    <div class="filter-group">
+      <div class="label">Оператор меры</div>
+      <div class="chip-list" id="operatorChips"></div>
     </div>
 
     <div class="filter-group">
@@ -84,9 +94,15 @@
     </div>
 
     <div class="filter-group">
-      <div class="label">Дата начала меры</div>
+      <div class="label">Период действия меры</div>
       <div class="date-range">
         <input type="date" id="startFrom"><span>—</span><input type="date" id="startTo">
+      </div>
+      <div class="chip-list" style="margin-top:8px">
+        <button type="button" class="chip" id="periodUnknownBtn" aria-pressed="true"
+                title="Показывать меры, у которых не указаны ни начало, ни окончание">Неизвестный период</button>
+        <button type="button" class="chip" id="periodOverlapBtn" aria-pressed="false"
+                title="Выкл. — выбранные даты входят в период меры; вкл. — периоды пересекаются">Пересекающийся период</button>
       </div>
     </div>
 
@@ -94,6 +110,11 @@
       <div class="label">НПА (реквизиты)</div>
       <input type="text" id="npaFilter" placeholder="например, № 295">
     </div>
+
+    <details class="filter-group" id="sphereDetails">
+      <summary class="label" style="cursor:pointer">Сфера реализации <span id="sphereCount"></span></summary>
+      <div class="chip-list" id="sphereChips" style="margin-top:8px"></div>
+    </details>
   </aside>
 
 </div>

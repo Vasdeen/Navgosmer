@@ -162,7 +162,7 @@
             const start = performance.now();
 
             // CSV must be in the same folder as this HTML file.
-            const response = await fetch("./data/measures_test.csv");
+            const response = await fetch("data/measures_test.csv");
 
             if (!response.ok) {
                 throw new Error(
@@ -1302,979 +1302,332 @@ if (filtersToggle) {
 
 //==========================================================================
 
-//==============================PDF========================================
-
 /* =========================================================
-   PDF — загрузка jsPDF
+   Печать дайджеста через window.print()
+   Русский текст отображается системными шрифтами браузера.
+   В диалоге печати выберите «Сохранить как PDF».
    ========================================================= */
 
-function loadJsPDF() {
-
-    if (
-        window.jspdf &&
-        window.jspdf.jsPDF
-    ) {
-        return Promise.resolve(
-            window.jspdf.jsPDF
-        );
-    }
-
-
-    return new Promise(
-        (resolve, reject) => {
-
-            const existing =
-                document.querySelector(
-                    'script[data-jspdf="true"]'
-                );
-
-
-            if (existing) {
-
-                existing.addEventListener(
-                    "load",
-                    () => {
-
-                        if (
-                            window.jspdf &&
-                            window.jspdf.jsPDF
-                        ) {
-                            resolve(
-                                window.jspdf.jsPDF
-                            );
-                        }
-
-                        else {
-                            reject(
-                                new Error(
-                                    "jsPDF не найден после загрузки."
-                                )
-                            );
-                        }
-                    },
-                    { once: true }
-                );
-
-
-                existing.addEventListener(
-                    "error",
-                    () => {
-                        reject(
-                            new Error(
-                                "Не удалось загрузить jsPDF."
-                            )
-                        );
-                    },
-                    { once: true }
-                );
-
-                return;
-            }
-
-
-            const script =
-                document.createElement("script");
-
-            script.src =
-                "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
-
-            script.async = true;
-
-            script.dataset.jspdf = "true";
-
-
-            script.onload = () => {
-
-                if (
-                    window.jspdf &&
-                    window.jspdf.jsPDF
-                ) {
-                    resolve(
-                        window.jspdf.jsPDF
-                    );
-                }
-
-                else {
-                    reject(
-                        new Error(
-                            "jsPDF не найден после загрузки."
-                        )
-                    );
-                }
-            };
-
-
-            script.onerror = () => {
-
-                reject(
-                    new Error(
-                        "Не удалось загрузить jsPDF. Проверьте интернет-соединение."
-                    )
-                );
-            };
-
-
-            document.head.appendChild(script);
-        }
-    );
-}
-
-/* =========================================================
-   PDF
-   ========================================================= */
-
-async function downloadResultsPDF() {
-
-    const button =
-        document.getElementById(
-            "downloadResultsBtn"
-        );
+function downloadResultsPDF() {
+    const button = document.getElementById("downloadResultsBtn");
+    const printRoot = document.getElementById("printResults");
 
     try {
-
-        const filtered =
-            DATA.filter(matchesFilters);
+        const filtered = DATA.filter(matchesFilters);
 
         if (!filtered.length) {
-
-            alert(
-                "Нет записей для формирования PDF."
-            );
-
+            alert("Нет записей для формирования PDF.");
             return;
+        }
+
+        if (!printRoot) {
+            throw new Error(
+                'В index.html не найден элемент <div id="printResults"></div>.'
+            );
         }
 
         if (button) {
             button.disabled = true;
-            button.textContent = "Формирование PDF...";
+            button.textContent = "Подготовка печати...";
         }
 
-        const jsPDF =
-            await loadJsPDF();
+        const value = (item, key) => {
+            const v = item?.[key];
 
+            return v === undefined ||
+                v === null ||
+                String(v).trim() === ""
+                ? "—"
+                : String(v).trim();
+        };
 
-        /* =====================================================
-           СОЗДАНИЕ PDF
-           ===================================================== */
+        const escapeHTML = (text) => String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
 
-        const pdf =
-            new jsPDF({
-                orientation: "portrait",
-                unit: "mm",
-                format: "a4",
-                compress: true
-            });
+        const fields = (item) => ({
+            month: value(item, "Месяц"),
+            npa: value(item, "НПА"),
+            publication: value(item, "Дата публикации"),
+            npaDetails: value(
+                item,
+                "Реквизиты НПА, регламентирующего поддержку"
+            ),
+            title: value(item, "Название события (если есть)"),
+            type: value(item, "Тип меры поддержки"),
+            kind: value(item, "Вид меры поддержки"),
+            sphere: value(item, "Отрасль экономики"),
+            operator: value(
+                item,
+                "Оператор меры поддержки/инициатор"
+            ),
+            recipients: value(item, "Получатели меры"),
+            amount: value(item, "Размер оказываемой поддержки"),
+            start: value(
+                item,
+                "Срок проведения конкурса (начало) /начало действия НПА"
+            ),
+            end: value(
+                item,
+                "Срок проведения конкурса (окончание)"
+            ),
+            link: value(item, "Ссылка")
+        });
 
+        const row = (label, text, isLink = false) => {
+            const content = isLink && text !== "—"
+                ? `<a href="${escapeHTML(text)}">${escapeHTML(text)}</a>`
+                : escapeHTML(text);
 
-        /* =====================================================
-           ЗАГРУЗКА ROBOTO
-           ===================================================== */
+            return `
+                <div class="digest-row">
+                    <span class="digest-label">${escapeHTML(label)}:</span>
+                    ${content}
+                </div>
+            `;
+        };
 
-        
+        const cards = filtered.map((item) => {
+            const f = fields(item);
 
-        /* =====================================================
-           РЕГИСТРАЦИЯ ROBOTO В jsPDF
-           ===================================================== */
+            return `
+                <article class="digest-card">
+                    <div class="digest-card-top">
+                        <span>${escapeHTML(f.sphere)}</span>
+                        <span>${escapeHTML(f.publication)}</span>
+                    </div>
 
-        
+                    <h2>${escapeHTML(f.title)}</h2>
 
-        /* =====================================================
-           НАСТРОЙКИ СТРАНИЦЫ
-           ===================================================== */
+                    <div class="digest-card-rows">
+                        ${row("Отрасль экономики", f.sphere)}
+                        ${row("Тип меры поддержки", f.type)}
+                        ${row("Вид меры поддержки", f.kind)}
+                        ${row("Месяц", f.month)}
+                        ${row("Дата публикации", f.publication)}
+                        ${row("НПА", f.npa)}
+                        ${row("Реквизиты НПА", f.npaDetails)}
+                        ${row(
+                            "Оператор меры поддержки / инициатор",
+                            f.operator
+                        )}
+                        ${row("Получатели меры", f.recipients)}
+                        ${row("Размер оказываемой поддержки", f.amount)}
+                        ${row("Начало действия НПА / конкурса", f.start)}
+                        ${row("Окончание конкурса", f.end)}
+                        ${row("Источник", f.link, true)}
+                    </div>
+                </article>
+            `;
+        }).join("\n");
 
-        const PAGE_WIDTH = 210;
-        const PAGE_HEIGHT = 297;
+        const now = new Date();
+        const dateLabel = now.toLocaleDateString("ru-RU");
+        const oldTitle = document.title;
 
-        const MARGIN_LEFT = 18;
-        const MARGIN_RIGHT = 18;
+        document.title = `Дайджест мер поддержки - ${dateLabel}`;
 
-        const CONTENT_WIDTH =
-            PAGE_WIDTH -
-            MARGIN_LEFT -
-            MARGIN_RIGHT;
+        printRoot.innerHTML = `
+            <div class="digest-print-document">
+                <header class="digest-print-header">
+                    <div class="digest-mark">М</div>
+                    <div>
+                        <h1>Дайджест мер поддержки</h1>
+                        <p>
+                            Результат поиска · ${filtered.length} записей ·
+                            ${escapeHTML(dateLabel)}
+                        </p>
+                    </div>
+                </header>
 
-        const TOP = 17;
-        const BOTTOM = 17;
+                <main class="digest-print-cards">
+                    ${cards}
+                </main>
 
-        const ITEMS_PER_PAGE = 3;
+                <footer class="digest-print-footer">
+                    Дайджест мер поддержки
+                </footer>
+            </div>
+        `;
 
+        let style = document.getElementById("digestPrintStyles");
 
-        /* =====================================================
-           Безопасное значение
-           ===================================================== */
+        if (!style) {
+            style = document.createElement("style");
+            style.id = "digestPrintStyles";
+            document.head.appendChild(style);
+        }
 
-        function getValue(item, key) {
-
-            const value =
-                item[key];
-
-            if (
-                value === undefined ||
-                value === null ||
-                String(value).trim() === ""
-            ) {
-                return "—";
+        style.textContent = `
+            #printResults {
+                display: none;
             }
 
-            return String(value);
-        }
-
-
-        /* =====================================================
-           Перенос текста
-           ===================================================== */
-
-        function wrapText(
-            text,
-            width,
-            fontSize
-        ) {
-
-            pdf.setFont(
-                "roboto",
-                "normal"
-            );
-
-            pdf.setFontSize(
-                fontSize
-            );
-            pdf.setFont("Roboto", "normal");
-pdf.setFontSize(fontSize);
-
-return pdf.splitTextToSize(
-    String(text),
-    width
-);
-            
-        }
-
-
-        /* =====================================================
-           Шапка
-           ===================================================== */
-
-        function drawHeader() {
-
-            pdf.setFillColor(
-                25,
-                37,
-                48
-            );
-
-            pdf.rect(
-                0,
-                0,
-                PAGE_WIDTH,
-                10,
-                "F"
-            );
-
-
-            pdf.setFillColor(
-                40,
-                58,
-                73
-            );
-
-            pdf.roundedRect(
-                MARGIN_LEFT,
-                TOP,
-                13,
-                13,
-                2,
-                2,
-                "F"
-            );
-
-
-            pdf.setFont(
-                "roboto",
-                "bold"
-            );
-
-            pdf.setFontSize(10);
-
-            pdf.setTextColor(
-                255,
-                255,
-                255
-            );
-
-            pdf.text(
-                "М",
-                MARGIN_LEFT + 6.5,
-                TOP + 8.5,
-                {
-                    align: "center"
+            @media print {
+                @page {
+                    size: A4;
+                    margin: 14mm 13mm 16mm;
                 }
-            );
 
-
-            pdf.setFont(
-                "roboto",
-                "bold"
-            );
-
-            pdf.setFontSize(18);
-
-            pdf.setTextColor(
-                25,
-                37,
-                48
-            );
-
-            pdf.text(
-                "Дайджест мер поддержки",
-                MARGIN_LEFT,
-                TOP + 23
-            );
-
-
-            pdf.setFont(
-                "roboto",
-                "normal"
-            );
-
-            pdf.setFontSize(9);
-
-            pdf.setTextColor(
-                100,
-                110,
-                120
-            );
-
-            pdf.text(
-                "Результат поиска",
-                MARGIN_LEFT,
-                TOP + 29
-            );
-
-
-            pdf.setDrawColor(
-                220,
-                225,
-                230
-            );
-
-            pdf.line(
-                MARGIN_LEFT,
-                TOP + 34,
-                PAGE_WIDTH - MARGIN_RIGHT,
-                TOP + 34
-            );
-        }
-
-
-        /* =====================================================
-           Footer
-           ===================================================== */
-
-        function drawFooter(pageNumber) {
-
-            pdf.setDrawColor(
-                225,
-                228,
-                232
-            );
-
-            pdf.line(
-                MARGIN_LEFT,
-                PAGE_HEIGHT - 13,
-                PAGE_WIDTH - MARGIN_RIGHT,
-                PAGE_HEIGHT - 13
-            );
-
-
-            pdf.setFont(
-                "roboto",
-                "normal"
-            );
-
-            pdf.setFontSize(7.5);
-
-            pdf.setTextColor(
-                130,
-                135,
-                140
-            );
-
-
-            pdf.text(
-                "Дайджест мер поддержки",
-                MARGIN_LEFT,
-                PAGE_HEIGHT - 7
-            );
-
-
-            pdf.text(
-                `Страница ${pageNumber}`,
-                PAGE_WIDTH - MARGIN_RIGHT,
-                PAGE_HEIGHT - 7,
-                {
-                    align: "right"
+                body.digest-printing > *:not(#printResults) {
+                    display: none !important;
                 }
-            );
-        }
 
-
-        /* =====================================================
-           Поля записи
-           ===================================================== */
-
-        function getFields(item) {
-
-            return {
-
-                month:
-                    getValue(
-                        item,
-                        "Месяц"
-                    ),
-
-                npa:
-                    getValue(
-                        item,
-                        "НПА"
-                    ),
-
-                publication:
-                    getValue(
-                        item,
-                        "Дата публикации"
-                    ),
-
-                npaDetails:
-                    getValue(
-                        item,
-                        "Реквизиты НПА, регламентирующего поддержку"
-                    ),
-
-                title:
-                    getValue(
-                        item,
-                        "Название события (если есть)"
-                    ),
-
-                type:
-                    getValue(
-                        item,
-                        "Тип меры поддержки"
-                    ),
-
-                kind:
-                    getValue(
-                        item,
-                        "Вид меры поддержки"
-                    ),
-
-                sphere:
-                    getValue(
-                        item,
-                        "Отрасль экономики"
-                    ),
-
-                operator:
-                    getValue(
-                        item,
-                        "Оператор меры поддержки/инициатор"
-                    ),
-
-                recipients:
-                    getValue(
-                        item,
-                        "Получатели меры"
-                    ),
-
-                amount:
-                    getValue(
-                        item,
-                        "Размер оказываемой поддержки"
-                    ),
-
-                start:
-                    getValue(
-                        item,
-                        "Срок проведения конкурса (начало) /начало действия НПА"
-                    ),
-
-                end:
-                    getValue(
-                        item,
-                        "Срок проведения конкурса (окончание)"
-                    ),
-
-                link:
-                    getValue(
-                        item,
-                        "Ссылка"
-                    )
-            };
-        }
-
-
-        /* =====================================================
-           Высота карточки
-           ===================================================== */
-
-        function getCardHeight(item) {
-
-            const f =
-                getFields(item);
-
-            const innerWidth =
-                CONTENT_WIDTH - 12;
-
-
-            const titleLines =
-                wrapText(
-                    f.title,
-                    innerWidth,
-                    11
-                );
-
-
-            const rows = [
-
-                `Отрасль экономики: ${f.sphere}`,
-
-                `Тип меры поддержки: ${f.type}`,
-
-                `Вид меры поддержки: ${f.kind}`,
-
-                `Месяц: ${f.month}`,
-
-                `Дата публикации: ${f.publication}`,
-
-                `НПА: ${f.npa}`,
-
-                `Реквизиты НПА: ${f.npaDetails}`,
-
-                `Оператор меры поддержки / инициатор: ${f.operator}`,
-
-                `Получатели меры: ${f.recipients}`,
-
-                `Размер оказываемой поддержки: ${f.amount}`,
-
-                `Начало действия НПА / конкурса: ${f.start}`,
-
-                `Окончание конкурса: ${f.end}`,
-
-                `Источник: ${f.link}`
-
-            ];
-
-
-            let rowsHeight = 0;
-
-
-            rows.forEach(row => {
-
-                const lines =
-                    wrapText(
-                        row,
-                        innerWidth,
-                        7
-                    );
-
-                rowsHeight +=
-                    lines.length * 3.2 + 1.1;
-            });
-
-
-            return (
-                11 +
-                titleLines.length * 4.8 +
-                3 +
-                rowsHeight +
-                7
-            );
-        }
-
-
-        /* =====================================================
-           Отрисовка карточки
-           ===================================================== */
-
-        function drawCard(item, y) {
-
-            const f =
-                getFields(item);
-
-            const x =
-                MARGIN_LEFT;
-
-            const width =
-                CONTENT_WIDTH;
-
-            const height =
-                getCardHeight(item);
-
-            const innerX =
-                x + 6;
-
-            const innerWidth =
-                width - 12;
-
-
-            pdf.setFillColor(
-                247,
-                249,
-                251
-            );
-
-            pdf.roundedRect(
-                x,
-                y,
-                width,
-                height,
-                2,
-                2,
-                "F"
-            );
-
-
-            /*
-             * Верхняя строка
-             */
-
-            pdf.setFont(
-                "roboto",
-                "normal"
-            );
-
-            pdf.setFontSize(7.5);
-
-            pdf.setTextColor(
-                90,
-                100,
-                110
-            );
-
-
-            pdf.text(
-                f.sphere,
-                innerX,
-                y + 7
-            );
-
-
-            pdf.text(
-                f.publication,
-                x + width - 6,
-                y + 7,
-                {
-                    align: "right"
+                body.digest-printing #printResults {
+                    display: block !important;
                 }
-            );
 
-
-            /*
-             * Заголовок
-             */
-
-            let cursorY =
-                y + 13;
-
-
-            pdf.setFont(
-                "roboto",
-                "bold"
-            );
-
-            pdf.setFontSize(11);
-
-            pdf.setTextColor(
-                25,
-                35,
-                45
-            );
-
-
-            const titleLines =
-                pdf.splitTextToSize(
-                    f.title,
-                    innerWidth
-                );
-
-
-            pdf.text(
-                titleLines,
-                innerX,
-                cursorY,
-                {
-                    lineHeightFactor: 1.12
+                body.digest-printing #printResults * {
+                    box-sizing: border-box;
                 }
-            );
 
+                body.digest-printing #printResults {
+                    color: #192530;
+                    font-family: Arial, Helvetica, sans-serif;
+                    font-size: 9pt;
+                }
 
-            cursorY +=
-                titleLines.length * 4.8 +
-                3;
+                .digest-print-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    border-bottom: 1px solid #dce1e6;
+                    padding-bottom: 12px;
+                    margin-bottom: 16px;
+                }
 
+                .digest-mark {
+                    width: 38px;
+                    height: 38px;
+                    flex: 0 0 38px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 6px;
+                    background: #283a49;
+                    color: #fff;
+                    font-size: 20pt;
+                    font-weight: 700;
+                }
 
-            /*
-             * Данные
-             */
+                .digest-print-header h1 {
+                    margin: 0 0 4px;
+                    font-size: 20pt;
+                    line-height: 1.2;
+                }
 
-            const rows = [
+                .digest-print-header p {
+                    margin: 0;
+                    color: #647078;
+                    font-size: 9pt;
+                }
 
-                `Отрасль экономики: ${f.sphere}`,
+                .digest-card {
+                    break-inside: avoid;
+                    page-break-inside: avoid;
+                    border: 1px solid #dce2e8;
+                    border-radius: 6px;
+                    background: #f7f9fb;
+                    padding: 11px 12px;
+                    margin: 0 0 12px;
+                }
 
-                `Тип меры поддержки: ${f.type}`,
+                .digest-card-top {
+                    display: flex;
+                    justify-content: space-between;
+                    gap: 12px;
+                    color: #5a646e;
+                    font-size: 8pt;
+                    margin-bottom: 7px;
+                }
 
-                `Вид меры поддержки: ${f.kind}`,
+                .digest-card h2 {
+                    margin: 0 0 9px;
+                    font-size: 12pt;
+                    line-height: 1.3;
+                    overflow-wrap: anywhere;
+                }
 
-                `Месяц: ${f.month}`,
+                .digest-card-rows {
+                    display: block;
+                }
 
-                `Дата публикации: ${f.publication}`,
+                .digest-row {
+                    margin: 0 0 4px;
+                    line-height: 1.35;
+                    overflow-wrap: anywhere;
+                }
 
-                `НПА: ${f.npa}`,
+                .digest-label {
+                    font-weight: 700;
+                }
 
-                `Реквизиты НПА: ${f.npaDetails}`,
+                .digest-row a {
+                    color: #174f83;
+                    text-decoration: underline;
+                    overflow-wrap: anywhere;
+                }
 
-                `Оператор меры поддержки / инициатор: ${f.operator}`,
-
-                `Получатели меры: ${f.recipients}`,
-
-                `Размер оказываемой поддержки: ${f.amount}`,
-
-                `Начало действия НПА / конкурса: ${f.start}`,
-
-                `Окончание конкурса: ${f.end}`,
-
-                `Источник: ${f.link}`
-
-            ];
-
-
-            pdf.setFont(
-                "roboto",
-                "normal"
-            );
-
-            pdf.setFontSize(7);
-
-            pdf.setTextColor(
-                80,
-                90,
-                100
-            );
-
-
-            rows.forEach(row => {
-
-                const lines =
-                    pdf.splitTextToSize(
-                        row,
-                        innerWidth
-                    );
-
-
-                pdf.text(
-                    lines,
-                    innerX,
-                    cursorY,
-                    {
-                        lineHeightFactor: 1.1
-                    }
-                );
-
-
-                cursorY +=
-                    lines.length * 3.2 +
-                    1.1;
-            });
-
-
-            return y + height;
-        }
-
-
-        /* =====================================================
-           Создание страниц
-           ===================================================== */
-
-        let pageNumber = 1;
-
-
-        for (
-            let start = 0;
-            start < filtered.length;
-            start += ITEMS_PER_PAGE
-        ) {
-
-            if (start > 0) {
-
-                pdf.addPage();
-
-                pageNumber++;
-            }
-
-
-            drawHeader();
-
-
-            const pageItems =
-                filtered.slice(
-                    start,
-                    start + ITEMS_PER_PAGE
-                );
-
-
-            const contentTop =
-                TOP + 40;
-
-            const contentBottom =
-                PAGE_HEIGHT -
-                BOTTOM -
-                17;
-
-            const availableHeight =
-                contentBottom -
-                contentTop;
-
-
-            const heights =
-                pageItems.map(
-                    item =>
-                        getCardHeight(item)
-                );
-
-
-            const cardsHeight =
-                heights.reduce(
-                    (sum, height) =>
-                        sum + height,
-                    0
-                );
-
-
-            const baseGap = 5;
-
-            let gap =
-                baseGap;
-
-
-            if (
-                pageItems.length > 1
-            ) {
-
-                const freeSpace =
-                    availableHeight -
-                    cardsHeight -
-                    baseGap *
-                    (pageItems.length - 1);
-
-
-                if (freeSpace > 0) {
-
-                    gap =
-                        baseGap +
-                        freeSpace /
-                        (pageItems.length - 1);
+                .digest-print-footer {
+                    border-top: 1px solid #dce1e6;
+                    margin-top: 16px;
+                    padding-top: 7px;
+                    color: #82878c;
+                    font-size: 8pt;
                 }
             }
+        `;
 
+        const cleanup = () => {
+            document.body.classList.remove("digest-printing");
+            document.title = oldTitle;
 
-            let y =
-                contentTop;
+            if (button) {
+                button.disabled = false;
+                button.textContent = "Скачать PDF";
+            }
 
+            window.removeEventListener("afterprint", cleanup);
+        };
 
-            pageItems.forEach(
-                (item, index) => {
+        window.addEventListener("afterprint", cleanup, { once: true });
 
-                    y =
-                        drawCard(
-                            item,
-                            y
-                        );
+        document.body.classList.add("digest-printing");
 
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                window.print();
+            });
+        });
 
-                    if (
-                        index <
-                        pageItems.length - 1
-                    ) {
-
-                        y += gap;
-                    }
-                }
-            );
-
-
-            drawFooter(
-                pageNumber
-            );
-        }
-
-
-        /* =====================================================
-           Сохранение
-           ===================================================== */
-
-        const now =
-            new Date();
-
-        const day =
-            String(
-                now.getDate()
-            ).padStart(2, "0");
-
-        const month =
-            String(
-                now.getMonth() + 1
-            ).padStart(2, "0");
-
-        const year =
-            now.getFullYear();
-
-
-        pdf.save(
-            `digest-${day}.${month}.${year}.pdf`
-        );
-
-    }
-
-    catch (error) {
-
-        console.error(
-            "Ошибка формирования PDF:",
-            error
-        );
+    } catch (error) {
+        console.error("Ошибка подготовки печати:", error);
 
         alert(
-            "Не удалось сформировать PDF:\n\n" +
+            "Не удалось подготовить печать:\n\n" +
             (error?.message || error)
         );
-    }
-
-    finally {
 
         if (button) {
-
             button.disabled = false;
-
-            button.textContent =
-                "Скачать PDF";
+            button.textContent = "Скачать PDF";
         }
     }
 }
 
-
 /* =========================================================
-   Кнопка PDF
+   Кнопка печати / сохранения в PDF
    ========================================================= */
 
 const downloadResultsBtn =
-    document.getElementById(
-        "downloadResultsBtn"
-    );
+    document.getElementById("downloadResultsBtn");
 
 if (downloadResultsBtn) {
-
-    downloadResultsBtn.onclick =
-        downloadResultsPDF;
-    console.log(pdf.getFontList());
-} 
+    downloadResultsBtn.onclick = downloadResultsPDF;
+}
 
 //=========================================================================
     //==================Главная функция, запуск страницы============================

@@ -4,7 +4,6 @@ on:
   push:
     paths:
       - 'data/**'
-      - '!data/index.json'
   workflow_dispatch:
 
 permissions:
@@ -15,19 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Build index.json
         run: |
-          echo "Содержимое data/:"
-          ls -la data
-          python3 - <<'PY'
-          import json, os, sys
-          files = sorted(f for f in os.listdir("data") if f.lower().endswith(".csv"))
-          print("Найдено CSV:", files)
-          if not files:
-              sys.exit("В data/ нет .csv файлов — index.json не обновлён")
-          with open("data/index.json", "w", encoding="utf-8") as fh:
-              json.dump(files, fh, ensure_ascii=False, indent=2)
-          PY
+          ls -la data || true
+          find data -maxdepth 1 -type f -iname '*.csv' -printf '%f\n' | sort | python3 -c 'import sys,json; print(json.dumps([l.strip() for l in sys.stdin if l.strip()], ensure_ascii=False, indent=2))' > /tmp/index.json
+          cat /tmp/index.json
+          cp /tmp/index.json data/index.json
+
       - name: Commit
         run: |
           git config user.name "github-actions"

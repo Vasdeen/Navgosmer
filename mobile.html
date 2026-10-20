@@ -324,12 +324,27 @@
       sync();
     });
     sync();
+    return function setCollapsed(value) {
+      section.classList.toggle("collapsed", value);
+      sync();
+    };
   }
-  bindCollapse(filtersPane, $("filtersHead"));
-  bindCollapse(listPane, $("listHead"));
+  var setFiltersCollapsed = bindCollapse(filtersPane, $("filtersHead"));
+  var setListCollapsed    = bindCollapse(listPane, $("listHead"));
 
   /* ---- Окно публикации: открыть при выборе, закрыть кнопкой ---- */
+  // Перед открытием запоминаем, что было раскрыто, чтобы вернуть при закрытии
+  var saved = null;
+
   function showDetail() {
+    if (detailWrap.hidden) {
+      saved = {
+        filters: filtersPane.classList.contains("collapsed"),
+        list: listPane.classList.contains("collapsed")
+      };
+    }
+    setFiltersCollapsed(true);
+    setListCollapsed(true);
     detailWrap.hidden = false;
     setTimeout(function () {
       detailWrap.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -337,6 +352,11 @@
   }
   function hideDetail() {
     detailWrap.hidden = true;
+    if (saved) {
+      setFiltersCollapsed(saved.filters);
+      setListCollapsed(saved.list);
+      saved = null;
+    }
     var active = document.querySelector("#listItems .item.active");
     if (active) active.scrollIntoView({ block: "center" });
   }
@@ -350,7 +370,7 @@
 
   // app3.js (смена версии) возвращает заглушку — тогда окно прячем
   new MutationObserver(function () {
-    if (detailPane.querySelector(".placeholder")) detailWrap.hidden = true;
+    if (detailPane.querySelector(".placeholder") && !detailWrap.hidden) hideDetail();
   }).observe(detailPane, { childList: true });
 
   /* ---- Пока открыто окно версий — страница под ним не прокручивается ---- */

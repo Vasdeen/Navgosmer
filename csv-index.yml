@@ -1,0 +1,26 @@
+name: Update data/index.json
+
+on:
+  push:
+    paths:
+      - 'data/*.csv'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build index.json
+        run: |
+          cd data
+          ls -1 *.csv | python3 -c "import sys,json; print(json.dumps(sorted(l.strip() for l in sys.stdin), ensure_ascii=False, indent=2))" > index.json
+      - name: Commit
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add data/index.json
+          git diff --cached --quiet || (git commit -m "Update data/index.json" && git push)

@@ -160,14 +160,15 @@
 
 
     // Load CSV automatically.
-    async function loadCSV() {
+    async function loadCSV(fileName = window.currentCsv || "measures_test.csv") {
 
         try {
 
             const start = performance.now();
 
             // CSV must be in the same folder as this HTML file.
-            const response = await fetch("data/measures_test.csv");
+            window.currentCsv = fileName;
+            const response = await fetch("data/" + encodeURIComponent(fileName));
 
             if (!response.ok) {
                 throw new Error(
@@ -2026,5 +2027,143 @@ async function init() {
     }
 }
 
+
+//==================Выбор версии (CSV из папки data)============================
+
+const DEFAULT_CSV = "measures_test.csv";
+
+// Статический сайт не может «прочитать папку» напрямую, поэтому:
+// 1) пробуем data/index.json (массив имён файлов);
+// 2) пробуем список файлов, который отдаёт сервер для папки data/ (autoindex);
+// 3) если ничего не вышло — показываем только стандартный файл.
+async function listCSVFiles() {
+
+    try {
+        const r = await fetch("data/index.json", { cache: "no-store" });
+        if (r.ok) {
+            const json = await r.json();
+            const arr = Array.isArray(json) ? json : (json.files || []);
+            const files = arr
+                .map(String)
+                .filter(n => /\.csv$/i.test(n));
+            if (files.length) return files;
+        }
+    } catch (e) { /* идём дальше */ }
+
+    // GitHub Pages: список файлов папки data через GitHub API
+    // (user.github.io/repo/ -> репозиторий user/repo)
+    try {
+        if (location.hostname.endsWith(".github.io")) {
+            const owner = location.hostname.split(".")[0];
+            const parts = location.pathname.split("/").filter(Boolean);
+            const repo = parts.length && !/\.html?$/i.test(parts[0])
+                ? parts[0]
+                : owner + ".github.io";
+            const r = await fetch(
+                `https://api.github.com/repos/${owner}/${repo}/contents/data`
+            );
+            if (r.ok) {
+                const files = (await r.json())
+                    .filter(f => f.type === "file" && /\.csv$/i.test(f.name))
+                    .map(f => f.name)
+                    .sort();
+                if (files.length) return files;
+            }
+        }
+    } catch (e) { /* идём дальше */ }
+
+    try {
+        const r = await fetch("data/", { cache: "no-store" });
+        if (r.ok) {
+            const doc = new DOMParser()
+                .parseFromString(await r.text(), "text/html");
+            const files = [...doc.querySelectorAll("a[href]")]
+                .map(a => decodeURIComponent(
+                    a.getAttribute("href").split("?")[0].split("/").pop()
+                ))
+                .filter(n => /\.csv$/i.test(n));
+            if (files.length) return [...new Set(files)].sort();
+        }
+    } catch (e) { /* идём дальше */ }
+
+    return [DEFAULT_CSV];
+}
+
+async function switchVersion(fileName) {
+
+    try {
+        const data = await loadCSV(fileName);
+
+        DATA = data;
+
+        // Старый выбор и фильтры могут не подходить новым данным
+        state.selected = null;
+
+        const reset = document.getElementById("resetFilters");
+        if (reset) reset.click();
+
+        const detail = document.getElementById("detailPane");
+        if (detail) {
+            detail.innerHTML =
+                '<div class="placeholder"><p>Выберите публикацию слева, чтобы увидеть подробности</p></div>';
+        }
+
+        render();
+        return true;
+    }
+    catch (error) {
+        alert("Не удалось загрузить " + fileName + ":\n\n" +
+              (error?.message || error));
+        return false;
+    }
+}
+
+(function setupVersionModal() {
+
+    const openBtn  = document.getElementById("versionBtn");
+    const overlay  = document.getElementById("versionOverlay");
+    const backBtn  = document.getElementById("versionBack");
+    const listEl   = document.getElementById("versionList");
+
+    if (!openBtn || !overlay) return;
+
+    const close = () => overlay.classList.remove("open");
+
+    async function open() {
+        overlay.classList.add("open");
+        listEl.innerHTML = '<div class="version-empty">Загрузка списка…</div>';
+
+        const files = await listCSVFiles();
+        const current = window.currentCsv || DEFAULT_CSV;
+
+        listEl.innerHTML = "";
+        files.forEach(name => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "version-item" + (name === current ? " active" : "");
+            b.textContent = name;
+            if (name === current) {
+                const m = document.createElement("span");
+                m.className = "version-current";
+                m.textContent = "текущая";
+                b.appendChild(m);
+            }
+            b.onclick = async () => {
+                if (name !== (window.currentCsv || DEFAULT_CSV)) {
+                    if (!(await switchVersion(name))) return;
+                }
+                close();
+            };
+            listEl.appendChild(b);
+        });
+    }
+
+    openBtn.addEventListener("click", open);
+    backBtn.addEventListener("click", close);
+    overlay.addEventListener("click", e => { if (e.target === overlay) close(); });
+    document.addEventListener("keydown", e => {
+        if (e.key === "Escape") close();
+    });
+})();
 
 init();

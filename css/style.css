@@ -112,6 +112,85 @@
     cursor:pointer;
   }
 
+
+  /* ============ ВЫБОР ВЕРСИИ ============ */
+  .version-btn{
+    background:transparent;
+    color:#EFEDE6;
+    border:1px solid rgba(255,255,255,.3);
+    border-radius:7px;
+    padding:9px 14px;
+    font-family:var(--font-body);
+    font-weight:600;
+    font-size:13.5px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .version-btn:hover{ border-color:var(--gold); color:var(--gold); }
+
+  .version-overlay{
+    display:none;
+    position:fixed; inset:0;
+    background:rgba(15,27,51,.55);
+    z-index:200;
+    align-items:center; justify-content:center;
+    padding:20px;
+  }
+  .version-overlay.open{ display:flex; }
+  .version-modal{
+    position:relative;
+    background:var(--paper-raised);
+    border-radius:12px;
+    width:100%; max-width:480px;
+    max-height:80vh;
+    display:flex; flex-direction:column;
+    padding:56px 24px 24px;
+    box-shadow:0 20px 60px rgba(0,0,0,.3);
+  }
+  .version-back{
+    position:absolute; top:14px; left:14px;
+    background:transparent;
+    border:1px solid var(--line);
+    border-radius:7px;
+    padding:6px 12px;
+    font-family:var(--font-body);
+    font-weight:600; font-size:13px;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  .version-back:hover{ border-color:var(--ink); }
+  .version-modal h2{
+    font-family:var(--font-display);
+    font-size:20px; font-weight:600;
+    margin:0 0 2px;
+  }
+  .version-hint{
+    font-family:var(--font-mono);
+    font-size:12px; color:var(--muted);
+    margin:0 0 14px;
+  }
+  .version-list{ overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+  .version-item{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    text-align:left;
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:11px 14px;
+    font-family:var(--font-mono);
+    font-size:13px;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  .version-item:hover{ border-color:var(--forest); }
+  .version-item.active{ background:#EAF0E7; border-color:var(--forest); }
+  .version-current{
+    font-family:var(--font-body);
+    font-size:11px;
+    color:var(--forest);
+  }
+  .version-empty{ color:var(--muted); font-size:13.5px; padding:8px 0; }
+
   /* ============ LAYOUT ============ */
   .layout{
     display:grid;

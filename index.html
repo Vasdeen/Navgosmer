@@ -7,6 +7,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
+  <script>
+    if (window.matchMedia("(max-width: 768px)").matches) {
+        window.location.replace("./mobile.html");
+    }
+</script>
 </head>
 <body>
 
@@ -31,6 +36,7 @@
     <input id="searchInput" type="text" placeholder="Поиск по заголовку, НПА, описанию…" autocomplete="off">
   </div>
 
+  <button class="version-btn" id="versionBtn" type="button">Выбрать версию</button>
   <button class="filters-toggle" id="filtersToggle">Фильтры</button>
   <div class="topbar-meta" id="topbarMeta">— из — записей</div>
 </header>
@@ -117,6 +123,15 @@
     </details>
   </aside>
 
+</div>
+
+<div class="version-overlay" id="versionOverlay">
+  <div class="version-modal" role="dialog" aria-modal="true" aria-labelledby="versionTitle">
+    <button class="version-back" id="versionBack" type="button">← Назад</button>
+    <h2 id="versionTitle">Выбрать версию</h2>
+    <p class="version-hint">Файлы .csv из папки data</p>
+    <div class="version-list" id="versionList"></div>
+  </div>
 </div>
 
 <div id="printResults" class="print-only"></div>

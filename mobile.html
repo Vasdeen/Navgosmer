@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1B2A4A">
+<title>Дайджест мер поддержки — Башкортостан</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+
+<script>
+  // Широкий экран — на десктопную версию (зеркально редиректу в index.html)
+  if (window.matchMedia("(min-width: 769px)").matches) {
+    window.location.replace("./index.html");
+  }
+</script>
+
+<style>
+  /* =====================================================================
+     МОБИЛЬНАЯ ВЕРСИЯ — надстройка над css/style.css.
+     style.css не меняется; здесь только переопределения для узкого экрана.
+     ===================================================================== */
+
+  html, body { height: auto; min-height: 100%; }
+  body { overflow-x: hidden; }
+
+  /* ---------- Шапка: бренд + «Выбрать версию», ниже — поиск ---------- */
+  .topbar{
+    position: relative;
+    height: auto;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    padding: 12px 14px;
+  }
+  .brand{ flex: 1 1 0; min-width: 0; gap: 10px; white-space: normal; }
+  .brand svg{ width: 28px; height: 28px; }
+  .brand-text{ min-width: 0; }
+  .brand-text .kicker{ font-size: 9px; letter-spacing: .1em; }
+  .brand-text .title{ font-size: 17px; }
+
+  .version-btn{
+    flex: 0 0 auto;
+    max-width: 96px;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.15;
+    padding: 7px 10px;
+    font-size: 12.5px;
+  }
+  .searchwrap{ flex: 1 1 100%; max-width: none; order: 3; }
+  .searchwrap input,
+  .date-range input,
+  .text-filter input{ font-size: 16px; }   /* iOS не зумит поля при фокусе */
+  .topbar-meta{ display: none; }
+
+  /* ---------- Вертикальная компоновка: фильтры → публикации → окно ---------- */
+  .layout{
+    display: flex;
+    flex-direction: column;
+    height: auto;
+  }
+
+  /* Свёртываемые секции */
+  .m-head{ display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .m-collapse{
+    flex: 0 0 auto;
+    width: 32px; height: 32px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--ink);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .m-collapse::before{
+    content: "";
+    width: 8px; height: 8px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-135deg);   /* ˄ — секция раскрыта */
+    margin-top: 3px;
+  }
+  .collapsed .m-collapse::before{
+    transform: rotate(45deg);     /* ˅ — секция свёрнута */
+    margin-top: -3px;
+  }
+
+  /* --- Фильтры --- */
+  #filtersPane{
+    position: static;
+    top: auto; right: auto; bottom: auto;
+    width: auto;
+    transform: none;
+    transition: none;
+    box-shadow: none;
+    border-left: none;
+    border-bottom: 1px solid var(--line);
+    overflow: visible;
+    padding: 0 16px 10px;
+  }
+  #filtersPane .filters-head{ margin: 0; padding: 14px 0 10px; }
+  #filtersPane .reset-link{ margin-left: auto; }
+  #filtersPane.collapsed .filters-head{ padding-bottom: 14px; }
+  #filtersPane.collapsed .filter-group{ display: none; }
+  .chip{ padding: 7px 12px; }
+
+  /* --- Публикации --- */
+  #listPane{
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    overflow: visible;
+    max-height: none;
+  }
+  #listPane .list-pane-head{
+    position: static;
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: 6px 10px;
+    padding: 14px 16px;
+  }
+  #listPane .list-pane-head h2{ margin: 0; }
+  #listPane .list-pane-head .count{ flex: 1; }
+  #listPane .list-pane-head .btn-small{ flex: 1 1 100%; margin-top: 6px; }
+  #listPane.collapsed #listItems,
+  #listPane.collapsed #downloadResultsBtn{ display: none; }
+  .item{ padding: 14px 16px; }
+
+  /* --- Окно одной публикации --- */
+  .m-detail[hidden]{ display: none; }
+  .m-detail-bar{
+    position: sticky; top: 0; z-index: 30;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--ink);
+  }
+  .m-detail-bar span{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .m-close{
+    background: var(--gold);
+    color: var(--ink);
+    border: none;
+    border-radius: 7px;
+    padding: 8px 14px;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  #detailPane{ overflow: visible; padding: 18px 16px 32px; }
+  #detailPane .placeholder{ height: auto; padding: 40px 0; }
+  .detail-title{ font-size: 23px; margin-bottom: 14px; max-width: none; }
+  .detail-meta{ grid-template-columns: 1fr; padding: 14px 16px; }
+  .detail-section{ max-width: none; }
+  .detail-head{ flex-wrap: wrap; }
+  .detail-actions .btn{ width: 100%; justify-content: center; }
+
+  /* --- Окно «Выбрать версию»: по центру, 2/3 высоты экрана, затемнённый фон --- */
+  .version-overlay{ padding: 16px; }
+  .version-modal{
+    width: 100%;
+    max-width: 420px;
+    height: 66.667vh;
+    height: 66.667dvh;
+    max-height: none;
+    padding: 56px 18px 18px;
+  }
+  .version-list{ flex: 1 1 auto; min-height: 0; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+      <circle cx="15" cy="15" r="14" stroke="#C9962C" stroke-width="1.4"/>
+      <path d="M15 5 L17 12.5 L24.5 12.9 L18.3 17.2 L20.6 24.4 L15 19.9 L9.4 24.4 L11.7 17.2 L5.5 12.9 L13 12.5 Z"
+            fill="none" stroke="#EFEDE6" stroke-width="1.1"/>
+    </svg>
+    <div class="brand-text">
+      <span class="kicker">ЦСР · Республика Башкортостан</span>
+      <span class="title">Дайджест мер поддержки</span>
+    </div>
+  </div>
+
+  <button class="version-btn" id="versionBtn" type="button">Выбрать версию</button>
+
+  <div class="searchwrap">
+    <svg class="icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <circle cx="7" cy="7" r="5.2" stroke="#EFEDE6" stroke-width="1.3"/>
+      <line x1="11" y1="11" x2="15" y2="15" stroke="#EFEDE6" stroke-width="1.3" stroke-linecap="round"/>
+    </svg>
+    <input id="searchInput" type="text" placeholder="Поиск по заголовку, НПА, описанию…" autocomplete="off">
+  </div>
+
+  <div class="topbar-meta" id="topbarMeta">— из — записей</div>
+</header>
+
+<div class="layout">
+
+  <!-- 1. ФИЛЬТРЫ (по умолчанию свёрнуты; чтобы раскрыть — уберите класс "collapsed") -->
+  <aside class="filters-pane collapsed" id="filtersPane">
+    <div class="filters-head m-head" id="filtersHead">
+      <h2>Фильтры</h2>
+      <button class="reset-link" id="resetFilters" type="button">Сбросить всё</button>
+      <button class="m-collapse" type="button" aria-label="Свернуть или развернуть фильтры"></button>
+    </div>
+
+    <div class="filter-group">
+      <div class="label">Тип поддержки</div>
+      <div class="chip-list" id="typeChips"></div>
+    </div>
+
+    <div class="filter-group">
+      <div class="label">Вид поддержки</div>
+      <div class="chip-list" id="kindChips"></div>
+    </div>
+
+    <div class="filter-group">
+      <div class="label">Сайт</div>
+      <div class="chip-list" id="siteChips"></div>
+    </div>
+
+    <div class="filter-group">
+      <div class="label">Оператор меры</div>
+      <div class="chip-list" id="operatorChips"></div>
+    </div>
+
+    <div class="filter-group">
+      <div class="label">Дата публикации</div>
+      <div class="date-range">
+        <input type="date" id="pubFrom"><span>—</span><input type="date" id="pubTo">
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <div class="label">Период действия меры</div>
+      <div class="date-range">
+        <input type="date" id="startFrom"><span>—</span><input type="date" id="startTo">
+      </div>
+      <div class="chip-list" style="margin-top:8px">
+        <button type="button" class="chip" id="periodUnknownBtn" aria-pressed="true"
+                title="Показывать меры, у которых не указаны ни начало, ни окончание">Неизвестный период</button>
+        <button type="button" class="chip" id="periodOverlapBtn" aria-pressed="false"
+                title="Выкл. — выбранные даты входят в период меры; вкл. — периоды пересекаются">Пересекающийся период</button>
+      </div>
+    </div>
+
+    <div class="filter-group text-filter">
+      <div class="label">НПА (реквизиты)</div>
+      <input type="text" id="npaFilter" placeholder="например, № 295">
+    </div>
+
+    <details class="filter-group" id="sphereDetails">
+      <summary class="label" style="cursor:pointer">Сфера реализации <span id="sphereCount"></span></summary>
+      <div class="chip-list" id="sphereChips" style="margin-top:8px"></div>
+    </details>
+  </aside>
+
+  <!-- 2. ПУБЛИКАЦИИ -->
+  <aside class="list-pane" id="listPane">
+    <div class="list-pane-head m-head" id="listHead">
+      <h2>Публикации</h2>
+      <div class="count" id="listCount">14 записей</div>
+      <button class="m-collapse" type="button" aria-label="Свернуть или развернуть список"></button>
+      <button class="btn btn-ghost btn-small" id="downloadResultsBtn" type="button">⭳ Скачать результат поиска в PDF</button>
+    </div>
+    <div id="listItems"></div>
+  </aside>
+
+  <!-- 3. ОКНО ОДНОЙ ПУБЛИКАЦИИ (появляется после выбора, закрывается кнопкой) -->
+  <section class="m-detail" id="detailWrap" hidden>
+    <div class="m-detail-bar">
+      <span>Публикация</span>
+      <button class="m-close" id="detailClose" type="button">✕ Закрыть</button>
+    </div>
+    <main class="detail-pane" id="detailPane">
+      <div class="placeholder">
+        <p>Выберите публикацию, чтобы увидеть подробности</p>
+      </div>
+    </main>
+  </section>
+
+</div>
+
+<!-- Окно выбора версии (.csv из папки data) -->
+<div class="version-overlay" id="versionOverlay">
+  <div class="version-modal" role="dialog" aria-modal="true" aria-labelledby="versionTitle">
+    <button class="version-back" id="versionBack" type="button">← Назад</button>
+    <h2 id="versionTitle">Выбрать версию</h2>
+    <p class="version-hint">Файлы .csv из папки data</p>
+    <div class="version-list" id="versionList"></div>
+  </div>
+</div>
+
+<div id="printResults" class="print-only"></div>
+
+<script src="js/app3.js"></script>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+
+  var filtersPane = $("filtersPane");
+  var listPane    = $("listPane");
+  var detailWrap  = $("detailWrap");
+  var detailPane  = $("detailPane");
+  var versionOv   = $("versionOverlay");
+
+  /* ---- Сворачивание фильтров и списка (клик по шапке секции) ---- */
+  function bindCollapse(section, head) {
+    var btn = head.querySelector(".m-collapse");
+    function sync() {
+      btn.setAttribute("aria-expanded", String(!section.classList.contains("collapsed")));
+    }
+    head.addEventListener("click", function (e) {
+      if (e.target.closest("#resetFilters, #downloadResultsBtn")) return;
+      section.classList.toggle("collapsed");
+      sync();
+    });
+    sync();
+  }
+  bindCollapse(filtersPane, $("filtersHead"));
+  bindCollapse(listPane, $("listHead"));
+
+  /* ---- Окно публикации: открыть при выборе, закрыть кнопкой ---- */
+  function showDetail() {
+    detailWrap.hidden = false;
+    setTimeout(function () {
+      detailWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+  function hideDetail() {
+    detailWrap.hidden = true;
+    var active = document.querySelector("#listItems .item.active");
+    if (active) active.scrollIntoView({ block: "center" });
+  }
+
+  // capture: срабатывает до обработчика карточки из app3.js
+  $("listItems").addEventListener("click", function (e) {
+    if (e.target.closest(".item")) showDetail();
+  }, true);
+
+  $("detailClose").addEventListener("click", hideDetail);
+
+  // app3.js (смена версии) возвращает заглушку — тогда окно прячем
+  new MutationObserver(function () {
+    if (detailPane.querySelector(".placeholder")) detailWrap.hidden = true;
+  }).observe(detailPane, { childList: true });
+
+  /* ---- Пока открыто окно версий — страница под ним не прокручивается ---- */
+  new MutationObserver(function () {
+    document.body.style.overflow = versionOv.classList.contains("open") ? "hidden" : "";
+  }).observe(versionOv, { attributes: true, attributeFilter: ["class"] });
+})();
+</script>
+</body>
+</html>

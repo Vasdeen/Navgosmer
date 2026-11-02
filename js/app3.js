@@ -1,4 +1,4 @@
-    //==================Загрузка CSV============================
+//==================Загрузка CSV============================
     // Detect CSV delimiter automatically.
     function detectDelimiter(text) {
         const candidates = [";", ",", "\t", "|"];
@@ -2154,7 +2154,28 @@ async function switchVersion(fileName) {
                 }
                 close();
             };
-            listEl.appendChild(b);
+            // Строка: кнопка версии + кнопка «Скачать» (xlsx с тем же именем)
+            const row = document.createElement("div");
+            row.className = "version-row";
+            row.style.cssText = "display:flex;align-items:stretch;gap:8px;";
+            b.style.flex = "1";
+            b.style.minWidth = "0";
+
+            const xlsxName = name.replace(/\.csv$/i, ".xlsx");
+            const dl = document.createElement("a");
+            dl.className = "version-download";
+            dl.textContent = "Скачать";
+            dl.href = "data/" + encodeURIComponent(xlsxName);
+            dl.setAttribute("download", xlsxName);
+            dl.title = "Скачать " + xlsxName;
+            dl.style.cssText = "display:flex;align-items:center;flex:none;padding:0 14px;" +
+                "border:1px solid currentColor;border-radius:6px;text-decoration:none;" +
+                "color:inherit;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap;";
+            dl.addEventListener("click", e => e.stopPropagation());
+
+            row.appendChild(b);
+            row.appendChild(dl);
+            listEl.appendChild(row);
         });
     }
 

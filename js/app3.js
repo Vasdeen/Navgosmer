@@ -160,7 +160,7 @@
 
 
     // Load CSV automatically.
-    async function loadCSV(fileName = window.currentCsv || "measures_test.csv") {
+    async function loadCSV(fileName = window.currentCsv || "default.csv") {
 
         try {
 

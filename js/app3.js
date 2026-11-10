@@ -1240,7 +1240,7 @@ function renderDetail(item) {
             </div>
 
 
-            <div class="meta-item">
+            <!--<div class="meta-item">
 
                 <div class="k">
                     НПА
@@ -1248,9 +1248,9 @@ function renderDetail(item) {
 
                 <div class="v">
                     ${npa}
-                </div>
+                </div> 
 
-            </div>
+            </div> -->
 
 
             <div class="meta-item">
